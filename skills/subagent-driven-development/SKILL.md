@@ -42,6 +42,17 @@ digraph when_to_use {
 - Review after each task (spec compliance + code quality), broad review at the end
 - Faster iteration (no human-in-loop between tasks)
 
+## Step 0: Assumption-Verification Gate (HARD GATE — always runs first)
+
+Before extracting tasks or dispatching any implementer:
+1. **REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions.
+2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table into plan.md.
+3. **Dispatch an implementer only for tasks whose gating premises are PASS.** BLOCKER/UNKNOWN → that task and its dependents are not dispatched; independent all-PASS tasks may proceed.
+4. Empty Assumptions section → instant PASS no-op; continue.
+5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → re-run the gate for changed/added tasks before dispatching them.
+
+Never skipped; runs in subagents (consistent with this skill's discipline).
+
 ## The Process
 
 ```dot
@@ -60,11 +71,13 @@ digraph process {
         "Mark task complete in todo list and progress ledger" [shape=box];
     }
 
+    "Step 0: run verifying-assumptions gate" [shape=box style=filled fillcolor=lightyellow];
     "Read plan, note context and global constraints, create todos" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent (../requesting-code-review/code-reviewer.md)" [shape=box];
     "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
+    "Step 0: run verifying-assumptions gate" -> "Read plan, note context and global constraints, create todos";
     "Read plan, note context and global constraints, create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
@@ -406,6 +419,7 @@ Done!
 ## Integration
 
 **Required workflow skills:**
+- **superpowers:verifying-assumptions** - Step 0 gate; verifies the plan's assumptions before any implementer is dispatched
 - **superpowers:using-git-worktrees** - Ensures isolated workspace (creates one or verifies existing)
 - **superpowers:writing-plans** - Creates the plan this skill executes
 - **superpowers:requesting-code-review** - Code review template for the final whole-branch review

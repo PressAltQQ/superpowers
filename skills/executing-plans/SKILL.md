@@ -15,6 +15,17 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ## The Process
 
+### Step 0: Assumption-Verification Gate (HARD GATE — always runs)
+
+Before reviewing or executing:
+1. **REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions.
+2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table into plan.md.
+3. **Do not start any step whose gating premises are not PASS.** BLOCKER/UNKNOWN on a step's premises → that step and its dependents do not start; independent all-PASS steps may proceed.
+4. Empty Assumptions section → instant PASS no-op; continue.
+5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → re-run the gate for changed/added steps.
+
+Never skipped, never run inline — it runs in subagents.
+
 ### Step 1: Load and Review Plan
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
@@ -23,7 +34,7 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ### Step 2: Execute Tasks
 
-For each task:
+For each task (only tasks whose gating premises PASSed in Step 0 — see the ## Verification Results table):
 1. Mark as in_progress
 2. Follow each step exactly (plan has bite-sized steps)
 3. Run verifications as specified
@@ -65,6 +76,7 @@ After all tasks complete and verified:
 ## Integration
 
 **Required workflow skills:**
+- **superpowers:verifying-assumptions** - Step 0 gate; verifies the plan's assumptions before execution
 - **superpowers:using-git-worktrees** - Ensures isolated workspace (creates one or verifies existing)
 - **superpowers:writing-plans** - Creates the plan this skill executes
 - **superpowers:finishing-a-development-branch** - Complete development after all tasks

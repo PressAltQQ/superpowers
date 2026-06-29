@@ -76,6 +76,38 @@ include this section.]
 ---
 ```
 
+**Every plan MUST also contain this `## Assumptions` section** (directly after `## Global Constraints`). If the plan depends on nothing external, write `_No external premises — gate is an instant PASS no-op._` and stop.
+
+```markdown
+## Assumptions
+
+### Versions (resolve before any behavioral claim; per host where it varies)
+| Tool/Lib | Host(s) | Resolved version | Source | Pin? | Mismatch verdict |
+|---|---|---|---|---|---|
+| docker | paris,almaty | 24.0.7 / 26.1.0 | `ssh <h> 'docker --version'` | none→installed | pin>inst=BLOCKER / pin<inst=SOFT |
+
+### A1. <one-line load-bearing premise>
+- **Type:** env | resource | partial-state | fs | code | version | data/contract | access | process
+- **Check:** <exact command / file read / grep / api call / version query>
+- **Expected:** <what proves it true>
+- **Severity:** BLOCKER | SOFT | INFO   (UNKNOWN is assigned at run time if the check can't execute)
+- **Blast radius:** high | low
+- **Gates steps:** <step IDs this premise blocks if false>
+- **Remediation if false:** <pre-task or fix, or "STOP + ask">
+
+### Behavioral claims (doc-grounded; everything not in the §6 whitelist)
+- "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man — verifier: ☐ (filled by gate)
+```
+
+## Assumptions Section (Pillar C — write-time grounding)
+
+When writing `## Assumptions`:
+
+1. **Resolve every tool/lib version** any behavioral claim depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; pin it now (gate re-confirms at execution).
+2. **Ground EVERY software-behavior claim except the §6 whitelist** (`cd, ls, mkdir, cp, mv, rm, echo, cat, pwd, exit`; `git {add, commit, push, pull, status, diff, log}`). Any other flag/option/config-key/subcommand needs an inline citation for the resolved version. **Destructive commands are grounded even if whitelisted.**
+3. **Write the citation inline at write time** (`src: <command/man/url> — semantics confirmed in <source>`), never retrofit. The gate re-confirms each independently — do not rely on it to fill gaps.
+4. Give each premise a **Blast radius** and **Gates steps** so the gate can do dependency-traced partial execution.
+
 ## Task Structure
 
 ````markdown
@@ -154,6 +186,12 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
 ## Execution Handoff
+
+**Before offering execution, hand off to the verification gate.** Tell the user:
+
+"Plan saved. Per the assumption-verification gate, the `## Assumptions` section will be verified by **independent subagent(s)** (superpowers:verifying-assumptions) as Step 0 of execution — gating steps will not start until their premises PASS. This runs automatically when you pick an execution mode below."
+
+(Do NOT run verification inline here — it runs as Step 0 inside the chosen execution skill, in subagents.)
 
 After saving the plan, offer execution choice:
 

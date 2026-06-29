@@ -36,7 +36,7 @@ Dispatch **one** independent Claude subagent (it needs the **whole-plan view**):
 3. **Pillar B — review the list (reality in hand):**
    - **Completeness:** "What does this plan depend on that is NOT listed?" incl. intra-plan consistency (step N doesn't break N−1's output), idempotency, ordering. Add missing premises as new `A<n>`.
    - **Checkability:** "Does each `check` actually prove its premise?" For **behavioral** claims do NOT trust the author's check — flag `trust-author-check: no` for independent doc confirmation in Tact 2.
-   - **Severity + Blast radius triage:** re-classify; author's severity is itself an assumption. Default when unsure → **BLOCKER**. Set `blast radius` high/low (drives Tact 2 depth).
+   - **Severity + Blast radius triage:** re-classify; author's severity is itself an assumption. Default when unsure → **BLOCKER**. Set `blast radius` high/low (drives Tact 2 depth). Behavioral claims arrive from the plan WITHOUT `Blast radius` or `Gates steps` (the author's `### Behavioral claims` list omits them) — assign both here during triage so Type-C blast-radius depth and dependency-traced partial execution are well-defined.
 
 **Tact 1 output (consumed by Tact 2):** resolved Versions table; `(lib,version)→doc-text` cache; triaged list (each with final Type, Severity, Blast radius, Gates steps, `trust-author-check`).
 
@@ -44,7 +44,7 @@ Dispatch **one** independent Claude subagent (it needs the **whole-plan view**):
 
 Dispatch **one subagent per assumption, in parallel** (per-check timeout). Each uses ONLY Tact 1's cached results. Route by `Type`:
 
-- **Type A (env/resource/partial-state/fs/code/version/data-contract/access/process):** run the check **against reality**; reality is source of truth, docs NOT used.
+- **Type A (env/resource/partial-state/fs/code/version/data/contract/access/process):** run the check **against reality**; reality is source of truth, docs NOT used.
 - **Type C (behavioral):** check the **cached doc** first.
   - If `trust-author-check: no`, independently confirm flag/subcommand/semantics from the cached `--help`/man/doc for the resolved version — do NOT rely on the author's grep (an author who assumes `--profile` and greps `--help | grep profile` rubber-stamps their own hallucination even when the real flag is `--profiles` or must follow `up`).
   - Escalate to a **sandboxed probe (read-only / crash-safe)** ONLY if the doc is silent/ambiguous or doc-trust is low — escalation, not default.

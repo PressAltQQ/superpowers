@@ -45,11 +45,22 @@ digraph when_to_use {
 ## Step 0: Assumption-Verification Gate (HARD GATE — always runs first)
 
 Before extracting tasks or dispatching any implementer:
+
+**Freshness check first (skip-guard).** Only when the plan contains a `<!-- ass-fp:start -->` marker **and** a `## Verification Results` table with a `gate-fingerprint` stamp: recompute the current fingerprint with the canonical command:
+
+```bash
+awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> | shasum -a 256 | cut -c1-16
+```
+
+- **Match** → the gate already ran and the assumptions region is unchanged. **No-op:** reuse the existing table, honor its verdicts (do not dispatch BLOCKER/UNKNOWN-gated tasks), do NOT re-dispatch verification subagents. Announce "Assumptions unchanged since verification — reusing gate results."
+- **Mismatch, or any of {no `ass-fp` markers, no table, no stamp}** → run the full gate below. (A plan without markers hashes to the empty-input value `e3b0c44298fc1c14` — never treat that as a match; it means the plan predates fingerprinting, so run the full gate.)
+
+**Full gate:**
 1. **REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions.
-2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table into plan.md.
+2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table (with a fresh `gate-fingerprint`) into plan.md.
 3. **Dispatch an implementer only for tasks whose gating premises are PASS.** BLOCKER/UNKNOWN → that task and its dependents are not dispatched; independent all-PASS tasks may proceed.
 4. Empty Assumptions section → instant PASS no-op; continue.
-5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → re-run the gate for changed/added tasks before dispatching them.
+5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → the fingerprint mismatches → re-run the gate for changed/added tasks before dispatching them.
 
 Never skipped; runs in subagents (consistent with this skill's discipline).
 

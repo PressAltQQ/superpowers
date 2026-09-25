@@ -80,6 +80,7 @@ include this section.]
 
 ```markdown
 ## Assumptions
+<!-- ass-fp:start -->
 
 ### Versions (resolve before any behavioral claim; per host where it varies)
 | Tool/Lib | Host(s) | Resolved version | Source | Pin? | Mismatch verdict |
@@ -97,7 +98,10 @@ include this section.]
 
 ### Behavioral claims (doc-grounded; everything not in the §6 whitelist)
 - "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man — verifier: ☐ (filled by gate)
+<!-- ass-fp:end -->
 ```
+
+> The `<!-- ass-fp:start -->` / `<!-- ass-fp:end -->` markers bracket the fingerprinted region: the verification gate hashes exactly the lines between them so an execution re-run can be skipped while the premises are unchanged. Keep both markers; the `## Verification Results` table is written *after* `ass-fp:end`, so it never affects the hash. (No-premise plans that write only `_No external premises …_` need no markers — the gate is an instant PASS no-op regardless.)
 
 ## Assumptions Section (Pillar C — write-time grounding)
 
@@ -187,13 +191,15 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 ## Execution Handoff
 
-**Before offering execution, hand off to the verification gate.** Tell the user:
+**Immediately after saving the plan, run the verification gate — do not wait for an execution choice.** Announce, then dispatch:
 
-"Plan saved. Per the assumption-verification gate, the `## Assumptions` section will be verified by **independent subagent(s)** (superpowers:verifying-assumptions) as Step 0 of execution — gating steps will not start until their premises PASS. This runs automatically when you pick an execution mode below."
+"Plan saved. Running the assumption-verification gate now via **independent subagent(s)** (superpowers:verifying-assumptions)."
 
-(Do NOT run verification inline here — it runs as Step 0 inside the chosen execution skill, in subagents.)
+**REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions here. It fans out subagents (Tact 1 + parallel Tact 2), checks `## Assumptions` against reality and docs, and writes the `## Verification Results` table (with a `gate-fingerprint` stamp) into plan.md. Empty Assumptions → instant PASS no-op. The gate runs in subagents, never inline in this orchestrator. Surface any BLOCKER/UNKNOWN with the standard options (Task 0 pre-remediation / revise / STOP) before offering execution.
 
-After saving the plan, offer execution choice:
+The chosen execution skill's Step 0 **reuses** this result as a no-op while the `## Assumptions` section stays byte-identical (it re-runs the gate only if that section changed) — so verifying here does not double the work.
+
+After the gate table is written, offer execution choice:
 
 **"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
 

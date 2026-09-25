@@ -18,11 +18,22 @@ Load plan, review critically, execute all tasks, report when complete.
 ### Step 0: Assumption-Verification Gate (HARD GATE — always runs)
 
 Before reviewing or executing:
+
+**Freshness check first (skip-guard).** Only when the plan contains a `<!-- ass-fp:start -->` marker **and** a `## Verification Results` table with a `gate-fingerprint` stamp: recompute the current fingerprint with the canonical command:
+
+```bash
+awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> | shasum -a 256 | cut -c1-16
+```
+
+- **Match** → the gate already ran and the assumptions region is unchanged. **No-op:** reuse the existing table, honor its verdicts (still do not start BLOCKER/UNKNOWN-gated steps), do NOT re-dispatch verification subagents. Announce "Assumptions unchanged since verification — reusing gate results."
+- **Mismatch, or any of {no `ass-fp` markers, no table, no stamp}** → run the full gate below. (A plan without markers hashes to the empty-input value `e3b0c44298fc1c14` — never treat that as a match; it means the plan predates fingerprinting, so run the full gate.)
+
+**Full gate:**
 1. **REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions.
-2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table into plan.md.
+2. It verifies the plan's `## Assumptions` in subagents (Tact 1 + parallel Tact 2) and writes a `## Verification Results` table (with a fresh `gate-fingerprint`) into plan.md.
 3. **Do not start any step whose gating premises are not PASS.** BLOCKER/UNKNOWN on a step's premises → that step and its dependents do not start; independent all-PASS steps may proceed.
 4. Empty Assumptions section → instant PASS no-op; continue.
-5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → re-run the gate for changed/added steps.
+5. After any fix → **re-verify ALL** checks. Plan edited mid-execution → the fingerprint mismatches → re-run the gate for changed/added steps.
 
 Never skipped, never run inline — it runs in subagents.
 

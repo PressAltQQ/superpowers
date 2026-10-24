@@ -88,7 +88,7 @@ Each premise lists `Gates steps`. Not a binary stop:
 
 ### Write the verdict table into plan.md (top of the execution section)
 
-The gate computes and stamps `gate-fingerprint` LAST, after every write into the ass-fp region (verifier ticks, Pillar B additions). Stamp the table with a **freshness fingerprint** of the fingerprinted assumptions region (the lines between the `<!-- ass-fp:start -->` / `<!-- ass-fp:end -->` markers) so an execution gate can skip a redundant re-run while nothing changed. Compute it (canonical command — must match the execution gates byte-for-byte):
+The gate computes and stamps `gate-fingerprint` LAST, after every write into the ass-fp region (verifier ticks, Pillar B additions). Stamp the table with a **freshness fingerprint** of the fingerprinted assumptions region (the lines between the `<!-- ass-fp:start -->` / `<!-- ass-fp:end -->` markers) so an execution gate can skip a redundant re-run while nothing changed (state rows still re-run their `Check` at execution Step 0: see assumption-gate.md). Compute it (canonical command — must match the execution gates byte-for-byte):
 
 ```bash
 awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> | shasum -a 256 | cut -c1-16
@@ -98,16 +98,18 @@ If the plan has no markers (e.g. a no-premise plan), skip the stamp — the gate
 
 ```markdown
 ## Verification Results
-<!-- gate-fingerprint: <hex16> — reuse this table while the ## Assumptions section stays byte-identical -->
+<!-- gate-fingerprint: <hex16> — reuse non-state rows while the ## Assumptions section stays byte-identical; state rows re-run at Step 0 -->
 
-| # | Premise | Type | Blast | Verdict | Notes |
-|---|---------|------|-------|---------|-------|
-| A1 | docker installed on paris | env | high | ✅ PASS | 26.1.0 |
-| A2 | port 8080 free | env | low | ⚠️ SOFT | in use by nginx |
-| C1 | `docker compose --profile` flag exists | behavioral | high | ✅ PASS | v2.27 docs confirmed |
-| A3 | /data/backups writable | fs | high | ❌ BLOCKER | permission denied |
-| C2 | new `parse()` handles empty input | acceptance | low | ⏭ DEFERRED | Task 2, Step 4 |
-| A4 | optional lint config present | fs | low | ⏭ SKIPPED | low blast radius — skipped |
+| # | Premise | Type | Blast | Verdict | Check | Notes |
+|---|---------|------|-------|---------|-------|-------|
+| A1 | docker installed on paris | env | high | ✅ PASS | `docker --version` | 26.1.0 |
+| A2 | port 8080 free | env | low | ⚠️ SOFT | `ss -ltn 'sport = :8080'` | in use by nginx |
+| C1 | `docker compose --profile` flag exists | behavioral | high | ✅ PASS | — | v2.27 docs confirmed |
+| A3 | /data/backups writable | fs | high | ❌ BLOCKER | `test -w /data/backups` | permission denied |
+| C2 | new `parse()` handles empty input | acceptance | low | ⏭ DEFERRED | — | Task 2, Step 4 |
+| A4 | optional lint config present | fs | low | ⏭ SKIPPED | — | low blast radius — skipped |
+
+**State rows** = Type env/fs/version/service/path/host-state, partial-state, data (Type A): record the exact `Check` command and the observed result as Expected (Notes). Other rows (behavioral, contract, acceptance, SKIPPED) have `—`.
 
 **SOFT warnings:** A2 — port 8080 occupied by nginx; verify compose port mapping.
 

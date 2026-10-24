@@ -15,10 +15,24 @@ current fingerprint with the canonical command:
 awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> | shasum -a 256 | cut -c1-16
 ```
 
-- **Match:** the gate already ran and the assumptions region is unchanged.
-  Reuse the existing table and honor its verdicts (do not start tasks gated
-  by a BLOCKER or UNKNOWN). Do NOT re-dispatch verification subagents.
-  Announce "Assumptions unchanged since verification — reusing gate results."
+- **Match:** the assumptions region is unchanged, but env may have drifted
+  since the gate ran. Do NOT re-dispatch the full gate; apply the split below.
+  - **Reused** (depend only on plan text + versions): doc/source-grounded
+    behavior (Type C), API contracts, acceptance/DEFERRED, SKIPPED.
+  - **Always re-run** (state rows: Type A env/fs/version/service/path/
+    host-state, partial-state, data-on-disk, `git apply --check` against the
+    pinned commit): run exactly the row's `Check` command, all in ONE
+    subagent (`model: sonnet`, mechanical), same probe budget, and compare
+    each result with the row's Expected (Notes).
+  - Result differs from Expected: re-judge that premise via the normal gate
+    path (may become BLOCKER). A different resolved version of a tool/lib:
+    every reused verdict citing that tool/lib/version is invalid; re-verify
+    those premises fully.
+  - All match: keep the table, append under it
+    `<!-- env re-check <ISO date> on <hostname>: N/N match -->` (outside the
+    ass-fp region; fingerprint unaffected).
+  Then honor the verdicts (do not start tasks gated by a BLOCKER or UNKNOWN).
+  Announce "Assumptions unchanged; state checks re-run: N/N match."
 - **Mismatch, or any of {no `ass-fp` markers, no table, no stamp}:** run the
   full gate below. A plan without markers hashes to the empty-input value
   `e3b0c44298fc1c14`; never treat that as a match, it means the plan predates

@@ -74,12 +74,14 @@ digraph process {
         "Append completion to ledger, mark todo complete" [shape=box];
     }
 
+    "Step 0: assumption gate" [shape=box];
     "Setup: worktree, ledger check, read plan, pre-flight review" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Final review and finish: read references/final-review.md" [shape=box];
     "Final review clean: delete this plan's workspace" [shape=box];
     "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
+    "Step 0: assumption gate" -> "Setup: worktree, ledger check, read plan, pre-flight review";
     "Setup: worktree, ledger check, read plan, pre-flight review" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer asks questions?";
     "Implementer asks questions?" -> "Answer questions, provide context" [label="yes"];
@@ -100,9 +102,7 @@ digraph process {
 
 ## Step 0: Assumption Gate (mandatory)
 
-Before Setup's ledger and Task 1, read
-[references/assumption-gate.md](references/assumption-gate.md) and run it.
-Dispatch only tasks whose gating premises PASS.
+Before Setup, run [references/assumption-gate.md](references/assumption-gate.md).
 
 ## Setup
 

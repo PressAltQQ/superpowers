@@ -73,8 +73,17 @@ Each premise lists `Gates steps`. Not a binary stop:
 
 ### Write the verdict table into plan.md (top of the execution section)
 
+Stamp the table with a **freshness fingerprint** of the fingerprinted assumptions region (the lines between the `<!-- ass-fp:start -->` / `<!-- ass-fp:end -->` markers) so an execution gate can skip a redundant re-run while nothing changed. Compute it (canonical command — must match the execution gates byte-for-byte):
+
+```bash
+awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> | shasum -a 256 | cut -c1-16
+```
+
+If the plan has no markers (e.g. a no-premise plan), skip the stamp — the gate is an instant PASS no-op anyway. Otherwise write the fingerprint as an HTML comment on the line directly under the `## Verification Results` heading.
+
 ```markdown
 ## Verification Results
+<!-- gate-fingerprint: <hex16> — reuse this table while the ## Assumptions section stays byte-identical -->
 
 | # | Premise | Type | Blast | Verdict | Notes |
 |---|---------|------|-------|---------|-------|

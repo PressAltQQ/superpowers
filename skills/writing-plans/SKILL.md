@@ -95,7 +95,7 @@ owns the code, in that task's own step style.]
 | docker | paris,almaty | 24.0.7 / 26.1.0 | `ssh <h> 'docker --version'` | none→installed | pin>inst=BLOCKER / pin<inst=SOFT |
 
 ### A1. <one-line load-bearing premise>
-- **Type:** env | resource | partial-state | fs | code | version | data/contract | access | process
+- **Type:** env | resource | partial-state | fs | code | version | data/contract | access | process | acceptance
 - **Check:** <exact command / file read / grep / api call / version query>
 - **Expected:** <what proves it true>
 - **Severity:** BLOCKER | SOFT | INFO   (UNKNOWN is assigned at run time if the check can't execute)
@@ -104,7 +104,7 @@ owns the code, in that task's own step style.]
 - **Remediation if false:** <pre-task or fix, or "STOP + ask">
 
 ### Premises about external behavior (cited at write time)
-- "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man — verifier: ☐ (filled by gate)
+- "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man
 
 ### Deferred acceptance (optional; only if worth listing)
 - "New `parse()` handles empty input" — **Deferred to:** Task 2, Step 4 (its test is the proof)
@@ -127,7 +127,7 @@ Sort every claim the plan leans on into one of two kinds.
 
 When writing `## Assumptions`:
 
-1. **Resolve every tool/lib version** any premise depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; pin it now (gate re-confirms at execution).
+1. **Resolve every tool/lib version** any premise depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; record the resolved version in the table (do not edit pyproject or lockfiles while planning; gate re-confirms at execution). For ranges or unpinned deps resolve also what the target will install (CI / fresh install / highest version the range allows, e.g. `pymupdf>=1.24` → latest; read-only `pip index versions` / `npm view`) and record both.
 2. **Cite the source inline at write time** (`src: <command/man/url> — semantics confirmed in <source>`), never retrofit. The gate re-confirms each independently — do not rely on it to fill gaps.
 3. Give each premise a **Blast radius** and **Gates steps** so the gate can do dependency-traced partial execution.
 4. **Implement nothing while planning.** No creating source modules, no installing project dependencies, no worktrees, no running the plan's code. Grounding a premise means read-only probes (`--version`, `--help`, reading installed source, `git apply --check`) and citing docs or source. If a premise cannot be settled that way, write it down as a premise and let the gate rule on it; a plan whose code already exists is an implementation, not a plan.
@@ -226,7 +226,7 @@ offering execution. Do not wait for an execution choice:
 
 "Plan saved. Running the assumption-verification gate now via **independent subagent(s)** (superpowers:verifying-assumptions)."
 
-**REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions here. It fans out subagents, checks `## Assumptions` against reality and docs, and writes the `## Verification Results` table (with a `gate-fingerprint` stamp) into the plan. Empty Assumptions is an instant PASS no-op. The gate runs in subagents, never inline in this session. Surface any BLOCKER/UNKNOWN with the standard options (Task 0 pre-remediation / revise the plan / STOP) before offering execution.
+**REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions here. It fans out subagents, checks `## Assumptions` against reality and docs, and writes the `## Verification Results` table (with a `gate-fingerprint` stamp) into the plan. Empty Assumptions is an instant PASS no-op. The gate runs in subagents, never inline in this session. Surface any BLOCKER/UNKNOWN with the standard options (Task 0 pre-remediation, after which the gate re-runs for the premises it fixed / revise the plan / STOP) before offering execution.
 
 The chosen execution skill's Step 0 reuses this result while the fingerprinted region stays byte-identical, so verifying here does not double the work.
 

@@ -37,12 +37,12 @@ awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> |
 4. Empty Assumptions is an instant PASS no-op; continue.
 5. After any fix, re-verify ALL checks. A plan edited mid-execution
    fingerprints differently: re-run the gate for the changed or added tasks
-   before they start.
+   before they start. After a Task 0 pre-remediation runs, re-run the gate
+   for the premises it fixed: Task 0 is outside the fingerprinted region, so
+   the fingerprint does not change.
 
 Never skipped, never run inline: the gate runs in subagents. When executing
-inline (executing-plans) you still dispatch the gate to subagents; if your
-harness has no subagent tool, say so to your human partner rather than
-running it yourself.
+inline (executing-plans) you still dispatch the gate to subagents.
 
 Run Step 0 before `task-start` for Task 1, and before the pre-flight scan.
 It does not change how `task-start` and `task-done` work.

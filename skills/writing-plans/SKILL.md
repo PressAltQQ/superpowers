@@ -103,8 +103,11 @@ owns the code, in that task's own step style.]
 - **Gates steps:** <step IDs this premise blocks if false>
 - **Remediation if false:** <pre-task or fix, or "STOP + ask">
 
-### Behavioral claims (doc-grounded; everything not in the §6 whitelist)
+### Premises about external behavior (cited at write time)
 - "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man — verifier: ☐ (filled by gate)
+
+### Deferred acceptance (optional; only if worth listing)
+- "New `parse()` handles empty input" — **Deferred to:** Task 2, Step 4 (its test is the proof)
 <!-- ass-fp:end -->
 
 ---
@@ -116,12 +119,18 @@ owns the code, in that task's own step style.]
 
 ## Assumptions Section (Pillar C — write-time grounding)
 
+Sort every claim the plan leans on into one of two kinds.
+
+**Premise** — true before Task 1 starts: tool and library versions, flags, config keys, API contracts of external libraries and services, paths, host state, existing data, the behavior of code that already exists. Premises go into `## Assumptions`, each with a source (command, doc, or URL) cited at write time.
+
+**Acceptance** — can only become true after the plan runs: the new code works, the new metrics match, the end-to-end run passes. It is not an assumption to verify now. It goes into the owning task's test. If you list it in Assumptions anyway, it carries `Deferred to: Task N, Step M`.
+
 When writing `## Assumptions`:
 
-1. **Resolve every tool/lib version** any behavioral claim depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; pin it now (gate re-confirms at execution).
-2. **Ground EVERY software-behavior claim except the §6 whitelist** (`cd, ls, mkdir, cp, mv, rm, echo, cat, pwd, exit`; `git {add, commit, push, pull, status, diff, log}`). Any other flag/option/config-key/subcommand needs an inline citation for the resolved version. **Destructive commands are grounded even if whitelisted.**
-3. **Write the citation inline at write time** (`src: <command/man/url> — semantics confirmed in <source>`), never retrofit. The gate re-confirms each independently — do not rely on it to fill gaps.
-4. Give each premise a **Blast radius** and **Gates steps** so the gate can do dependency-traced partial execution.
+1. **Resolve every tool/lib version** any premise depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; pin it now (gate re-confirms at execution).
+2. **Cite the source inline at write time** (`src: <command/man/url> — semantics confirmed in <source>`), never retrofit. The gate re-confirms each independently — do not rely on it to fill gaps.
+3. Give each premise a **Blast radius** and **Gates steps** so the gate can do dependency-traced partial execution.
+4. **Implement nothing while planning.** No creating source modules, no installing project dependencies, no worktrees, no running the plan's code. Grounding a premise means read-only probes (`--version`, `--help`, reading installed source, `git apply --check`) and citing docs or source. If a premise cannot be settled that way, write it down as a premise and let the gate rule on it; a plan whose code already exists is an implementation, not a plan.
 
 ## Task Structure
 

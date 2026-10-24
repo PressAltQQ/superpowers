@@ -13,6 +13,8 @@ The **hard gate** between a written plan and its execution. Verifies the plan's 
 
 **Three pillars, one pass:** A — env state vs reality; B — review the list itself (completeness, checkability, severity) with reality in hand; C — doc-ground behavioral claims to the resolved version.
 
+**Premises only.** The gate checks what is true before Task 1 starts. It never implements, builds, or replays the plan's own code to prove a claim. A claim about code or data the plan itself will create is **DEFERRED** to the step whose test proves it.
+
 ## D4 — everything runs in subagents
 
 Every check and analysis runs in a SUBAGENT, never inline in this orchestrator. Tact 2 subagents fan out **in parallel**. The orchestrator only dispatches and merges verdicts.
@@ -22,6 +24,14 @@ Every check and analysis runs in a SUBAGENT, never inline in this orchestrator. 
 - **Default reviewer = an independent Claude subagent** — NOT the plan's author.
 - Use **DeepSeek** (`ds` CLI / ask-deepseek) only when Mikhail explicitly asks (third opinion or sole reviewer). Never by default.
 - **Never switch model on your own.**
+
+## Probe budget (Tact 2 anti-materialization rule)
+
+Every Tact 2 checker runs read-only probes of about 60 s or less each. Forbidden: installing the project or its dependency set, builds, running against data corpora, creating worktrees, writing stubs, extracting or replaying the plan's code blocks. Patch applicability is `git apply --check` against the pinned commit, nothing more.
+
+**One exception.** For a high-blast dependency-version premise that docs, changelog, and source do not settle, the checker may create ONE throwaway isolated env in `/tmp` containing only that single library at the version in question, and run a minimal snippet. This is how a real BLOCKER ("PyMuPDF 2.0 breaks `Table.extract()` cell text") gets caught.
+
+A premise that cannot be settled within budget: external → **UNKNOWN** (= BLOCKER); plan-internal → **DEFERRED**.
 
 ## §6 whitelist (no citation needed)
 
@@ -47,8 +57,8 @@ Dispatch **one subagent per assumption, in parallel** (per-check timeout). Each 
 - **Type A (env/resource/partial-state/fs/code/version/data/contract/access/process):** run the check **against reality**; reality is source of truth, docs NOT used.
 - **Type C (behavioral):** check the **cached doc** first.
   - If `trust-author-check: no`, independently confirm flag/subcommand/semantics from the cached `--help`/man/doc for the resolved version — do NOT rely on the author's grep (an author who assumes `--profile` and greps `--help | grep profile` rubber-stamps their own hallucination even when the real flag is `--profiles` or must follow `up`).
-  - Escalate to a **sandboxed probe (read-only / crash-safe)** ONLY if the doc is silent/ambiguous or doc-trust is low — escalation, not default.
-  - Still not safely verifiable → **UNKNOWN** (= BLOCKER).
+  - Escalate to a probe ONLY if the doc is silent/ambiguous or doc-trust is low, and only within the Probe budget above — escalation, not default.
+  - Still not verifiable within budget → external premise: **UNKNOWN** (= BLOCKER); claim about code or data the plan will create: **DEFERRED**.
 
 **Blast-radius depth (§10):** high → always fully verified, skipping the expensive check is FORBIDDEN; low → expensive check MAY be skipped, recorded `"low blast radius — skipped"` (auditable, never silent).
 
@@ -63,11 +73,12 @@ Dispatch **one subagent per assumption, in parallel** (per-check timeout). Each 
 
 The orchestrator merges all Tact 2 verdicts (+ Tact 1 version-mismatch verdicts) into ONE table.
 
-- **PASS** — confirmed. **BLOCKER-fail** — false + load-bearing → gating steps don't start. **SOFT-fail** — proceed with warning. **INFO** — non-blocking. **UNKNOWN** — couldn't run → **treated as BLOCKER**, never silent.
+- **PASS** — confirmed. **BLOCKER-fail** — false + load-bearing → gating steps don't start. **SOFT-fail** — proceed with warning. **INFO** — non-blocking. **UNKNOWN** — couldn't run → **treated as BLOCKER**, never silent. **DEFERRED** — concerns code or data the plan itself creates; non-blocking, records the `Deferred to: Task N, Step M` whose test proves it. DEFERRED is not UNKNOWN and not BLOCKER; `UNKNOWN = BLOCKER` still holds for external premises.
 
 ### Dependency-traced partial execution
 
 Each premise lists `Gates steps`. Not a binary stop:
+- DEFERRED never gates a step.
 - Any BLOCKER/UNKNOWN on a step's premises → that step **and its dependents** do not start.
 - Independent steps whose premises **all PASS** → may proceed.
 
@@ -91,6 +102,7 @@ If the plan has no markers (e.g. a no-premise plan), skip the stamp — the gate
 | A2 | port 8080 free | env | low | ⚠️ SOFT | in use by nginx |
 | C1 | `docker compose --profile` flag exists | behavioral | high | ✅ PASS | v2.27 docs confirmed |
 | A3 | /data/backups writable | fs | high | ❌ BLOCKER | permission denied |
+| C2 | new `parse()` handles empty input | acceptance | low | ⏭ DEFERRED | Task 2, Step 4 |
 
 **SOFT warnings:** A2 — port 8080 occupied by nginx; verify compose port mapping.
 

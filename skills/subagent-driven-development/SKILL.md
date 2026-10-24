@@ -98,6 +98,12 @@ digraph process {
 }
 ```
 
+## Step 0: Assumption Gate (mandatory)
+
+Before Setup's ledger and Task 1, read
+[references/assumption-gate.md](references/assumption-gate.md) and run it.
+Dispatch only tasks whose gating premises PASS.
+
 ## Setup
 
 Ensure the work happens in an isolated workspace: use

@@ -105,6 +105,14 @@ digraph process {
 }
 ```
 
+## Step 0: Assumption Gate (mandatory)
+
+Before Task 1, read
+[assumption-gate](../subagent-driven-development/references/assumption-gate.md)
+and run it: reuse a fresh `## Verification Results` table when its
+`gate-fingerprint` matches, else run superpowers:verifying-assumptions in
+subagents. Start only tasks whose gating premises PASS.
+
 ## Setup
 
 Ensure the work happens in an isolated workspace: use

@@ -86,8 +86,42 @@ break the program. Write the list here, once, with the spec in front of
 you. Then, for each line, add the test that pins it to the task that
 owns the code, in that task's own step style.]
 
+## Assumptions
+<!-- ass-fp:start -->
+
+### Versions (resolve before any behavioral claim; per host where it varies)
+| Tool/Lib | Host(s) | Resolved version | Source | Pin? | Mismatch verdict |
+|---|---|---|---|---|---|
+| docker | paris,almaty | 24.0.7 / 26.1.0 | `ssh <h> 'docker --version'` | none→installed | pin>inst=BLOCKER / pin<inst=SOFT |
+
+### A1. <one-line load-bearing premise>
+- **Type:** env | resource | partial-state | fs | code | version | data/contract | access | process
+- **Check:** <exact command / file read / grep / api call / version query>
+- **Expected:** <what proves it true>
+- **Severity:** BLOCKER | SOFT | INFO   (UNKNOWN is assigned at run time if the check can't execute)
+- **Blast radius:** high | low
+- **Gates steps:** <step IDs this premise blocks if false>
+- **Remediation if false:** <pre-task or fix, or "STOP + ask">
+
+### Behavioral claims (doc-grounded; everything not in the §6 whitelist)
+- "`docker compose --profile X` selects profile X" — docker compose v2.x — src: `docker compose --help` (live) — semantics confirmed in man — verifier: ☐ (filled by gate)
+<!-- ass-fp:end -->
+
 ---
 ```
+
+**Every plan MUST also contain this `## Assumptions` section** (directly after `## Review Focus`, before the first task). If the plan depends on nothing external, write `_No external premises — gate is an instant PASS no-op._` and stop.
+
+> The `<!-- ass-fp:start -->` / `<!-- ass-fp:end -->` markers bracket the fingerprinted region: the verification gate hashes exactly the lines between them so an execution re-run can be skipped while the premises are unchanged. Keep both markers; the `## Verification Results` table is written *after* `ass-fp:end`, so it never affects the hash. (No-premise plans that write only `_No external premises …_` need no markers — the gate is an instant PASS no-op regardless.)
+
+## Assumptions Section (Pillar C — write-time grounding)
+
+When writing `## Assumptions`:
+
+1. **Resolve every tool/lib version** any behavioral claim depends on, **per host where it varies**, using `pin > installed (live probe: `tool --version` / `pip show` / `npm ls` / lockfile) > latest stable`. Record version + source in the Versions table; pin it now (gate re-confirms at execution).
+2. **Ground EVERY software-behavior claim except the §6 whitelist** (`cd, ls, mkdir, cp, mv, rm, echo, cat, pwd, exit`; `git {add, commit, push, pull, status, diff, log}`). Any other flag/option/config-key/subcommand needs an inline citation for the resolved version. **Destructive commands are grounded even if whitelisted.**
+3. **Write the citation inline at write time** (`src: <command/man/url> — semantics confirmed in <source>`), never retrofit. The gate re-confirms each independently — do not rely on it to fill gaps.
+4. Give each premise a **Blast radius** and **Gates steps** so the gate can do dependency-traced partial execution.
 
 ## Task Structure
 
@@ -178,7 +212,16 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 ## Execution Handoff
 
-After saving and self-reviewing the plan, link it for your human partner
+After saving and self-reviewing the plan, run the verification gate before
+offering execution. Do not wait for an execution choice:
+
+"Plan saved. Running the assumption-verification gate now via **independent subagent(s)** (superpowers:verifying-assumptions)."
+
+**REQUIRED SUB-SKILL:** Use superpowers:verifying-assumptions here. It fans out subagents, checks `## Assumptions` against reality and docs, and writes the `## Verification Results` table (with a `gate-fingerprint` stamp) into the plan. Empty Assumptions is an instant PASS no-op. The gate runs in subagents, never inline in this session. Surface any BLOCKER/UNKNOWN with the standard options (Task 0 pre-remediation / revise the plan / STOP) before offering execution.
+
+The chosen execution skill's Step 0 reuses this result while the fingerprinted region stays byte-identical, so verifying here does not double the work.
+
+After the gate table is written, link the plan for your human partner
 to read. If they have already explicitly supplied an execution method, ask
 them to review the plan and confirm it captures what they want; wait for that
 review before implementation, then use the preserved method. Otherwise, ask

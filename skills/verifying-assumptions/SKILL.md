@@ -54,6 +54,8 @@ Dispatch **one** independent Claude subagent (it needs the **whole-plan view**):
 
 Dispatch **one subagent per assumption, in parallel** (per-check timeout). Each uses ONLY Tact 1's cached results. Route by `Type`:
 
+**Model policy (only if the harness picks a model per subagent; else ignore).** Mechanical Tact 2 checks (Type A env/fs/version probes, "does flag X exist in `--help`/docs of version Y", path/service existence, `git apply --check`, version-resolution lookups) → `model: sonnet`. Never lower than Sonnet (no Haiku). Tact 1 and judgment checks (Type C where docs are ambiguous, the /tmp single-library probe, any high-blast verdict needing interpretation) → keep the session's default model; do not downgrade.
+
 - **Type acceptance:** routed straight to **DEFERRED**, never probed. Tact 1 first rejects/splits any DEFERRED/acceptance item that actually rests on external behavior (e.g. "Task 3's extractor returns correct cells" rests on a library's behavior: split out the library premise and check it). The gate also confirms the `Deferred to: Task N, Step M` step exists and is a test step; if not → **SOFT** with a note telling the executor to add that assertion.
 
 - **Type A (env/resource/partial-state/fs/code/version/data/contract/access/process):** run the check **against reality**; reality is source of truth, docs NOT used.

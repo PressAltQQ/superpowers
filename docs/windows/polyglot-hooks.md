@@ -6,9 +6,18 @@ Claude Code plugins need hooks that work on Windows, macOS, and Linux. This docu
 
 ## The Problem
 
-Claude Code runs hook commands through the system's default shell:
-- **Windows**: CMD.exe
+Claude Code runs hook commands through a shell:
 - **macOS/Linux**: bash or sh
+- **Windows with Git Bash installed**: Git Bash
+- **Windows without Git Bash**: PowerShell (older versions used CMD.exe)
+
+Neither Windows fallback shell can parse our command string: PowerShell treats
+a leading quoted path as a string expression and errors on the next bareword,
+and CMD.exe's `/c` quoting rules strip the outer quotes when the path contains
+a metacharacter such as `(`. Our hooks therefore declare `"shell": "bash"`
+(supported since Claude Code 2.1.81; older versions ignore the key), which
+forces the Git Bash route and, when Git Bash is absent, produces an actionable
+"install Git for Windows" error instead of a shell parser failure.
 
 This creates several challenges:
 
@@ -42,6 +51,7 @@ hooks/
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start",
+            "shell": "bash",
             "async": false
           }
         ]
@@ -67,12 +77,19 @@ afterward.
 
 1. The batch section validates the script name and resolves the hook directory
    from the dispatcher's own location.
-2. It tries bash in three places:
+2. It tries bash in four places, in order:
    - `C:\Program Files\Git\bin\bash.exe`
    - `C:\Program Files (x86)\Git\bin\bash.exe`
-   - `bash` on `PATH` (MSYS2, Cygwin, or a non-default Git install)
+   - `%LOCALAPPDATA%\Programs\Git\bin\bash.exe` (a per-user Git for Windows
+     install), only when `LOCALAPPDATA` is set
+   - `bash` on `PATH` (MSYS2, Cygwin, or a non-default Git install), found by
+     running `%SystemRoot%\System32\where.exe $PATH:bash`, so neither `where`
+     nor `bash` is taken from the current directory. The WSL launchers
+     (`bash.exe` in `System32`, `Sysnative`, or
+     `%LOCALAPPDATA%\Microsoft\WindowsApps`) and extensionless matches are
+     skipped, since the launchers fail when no Linux distro is installed.
 3. If bash is found, it runs the named extensionless hook script from the hooks
-   directory.
+   directory and exits with the script's exit code.
 4. If no bash is found, the dispatcher exits `0` silently — the plugin
    continues working, it just skips the hook.
 5. `exit /b` stops CMD before it reaches the Unix section.
@@ -132,7 +149,7 @@ escape_for_json() {
 
 ### "bash is not recognized"
 
-CMD couldn't find bash in any of the three locations the dispatcher tries. The dispatcher exits silently (0) rather than erroring, so the hook is skipped. Install Git for Windows at the standard path or ensure `bash` is on `PATH`.
+CMD couldn't find bash in any of the four locations the dispatcher tries. The dispatcher exits silently (0) rather than erroring, so the hook is skipped. Install Git for Windows (system-wide or per-user) or ensure a non-WSL `bash` is on `PATH`.
 
 ### Hook runs on Unix but does nothing on Windows
 
@@ -140,7 +157,7 @@ Check that the script filename is **extensionless** in `hooks.json`. A command l
 
 ### Hook doesn't fire at all
 
-Verify the `matcher` in `hooks.json` matches the event type your harness emits. Claude Code uses `startup|clear|compact`; Codex uses `startup|resume|clear`. Check `hooks-codex.json` for the Codex variant.
+Verify the `matcher` in `hooks.json` matches the event type your harness emits. Claude Code uses `startup|clear|compact`; Cursor uses `sessionStart`. Check `hooks-cursor.json` for the Cursor variant.
 
 ## Related Issues
 

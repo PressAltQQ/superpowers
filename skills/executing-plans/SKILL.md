@@ -111,8 +111,8 @@ digraph process {
 
 Before Task 1, read
 [assumption-gate](../subagent-driven-development/references/assumption-gate.md)
-and run it: reuse a fresh `## Verification Results` table when its
-`gate-fingerprint` matches, else run superpowers:verifying-assumptions in
+and run it: reuse a `## Verification Results` table when its
+`gate-fingerprint` matches (re-running its state checks), else run superpowers:verifying-assumptions in
 subagents. Start only tasks whose gating premises PASS.
 
 ## Setup

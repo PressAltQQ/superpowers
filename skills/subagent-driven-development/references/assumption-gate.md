@@ -32,7 +32,8 @@ awk '/<!-- ass-fp:start -->/{f=1;next} /<!-- ass-fp:end -->/{f=0} f' <plan.md> |
    plan.
 3. Start a task only when its gating premises are PASS. BLOCKER or UNKNOWN on
    a task's premises: that task and its dependents do not start; independent
-   all-PASS tasks may proceed.
+   all-PASS tasks may proceed. DEFERRED blocks nothing: the deferred-to
+   step's test is the proof.
 4. Empty Assumptions is an instant PASS no-op; continue.
 5. After any fix, re-verify ALL checks. A plan edited mid-execution
    fingerprints differently: re-run the gate for the changed or added tasks

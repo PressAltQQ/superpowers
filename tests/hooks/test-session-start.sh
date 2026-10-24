@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HOOK_UNDER_TEST="$REPO_ROOT/hooks/session-start"
-CODEX_HOOK_UNDER_TEST="$REPO_ROOT/hooks/session-start-codex"
 WRAPPER_UNDER_TEST="$REPO_ROOT/hooks/run-hook.cmd"
 
 FAILURES=0
@@ -144,6 +143,27 @@ for (const forbiddenText of forbiddenTexts) {
 
 echo "SessionStart hook output tests"
 
+# Registration shape: the hook must declare shell:"bash" so Claude Code on
+# Windows dispatches via Git Bash (or fails with an actionable error) instead
+# of PowerShell/cmd.exe, whose parsers break on the quoted command string
+# (PowerShell ParserError; cmd.exe quote-stripping on paths with metacharacters).
+if node -e '
+const hooks = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+const entry = hooks.hooks.SessionStart[0].hooks[0];
+if (entry.shell !== "bash") {
+  console.error(`SessionStart hook shell is ${JSON.stringify(entry.shell)}, expected "bash"`);
+  process.exit(1);
+}
+if (!/run-hook\.cmd" session-start$/.test(entry.command)) {
+  console.error(`unexpected SessionStart command shape: ${entry.command}`);
+  process.exit(1);
+}
+' "$REPO_ROOT/hooks/hooks.json"; then
+    pass "hooks.json registers SessionStart with shell:bash dispatch"
+else
+    fail "hooks.json registers SessionStart with shell:bash dispatch"
+fi
+
 claude_home="$(make_home claude-code)"
 assert_command_output \
     "Claude Code emits nested SessionStart additionalContext" \
@@ -154,35 +174,15 @@ assert_command_output \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
     bash "$HOOK_UNDER_TEST"
 
-codex_home="$(make_home codex-plugin-hooks)"
-codex_data="$TEST_ROOT/codex-plugin-hooks/data"
-mkdir -p "$codex_data"
+wrapper_home="$(make_home run-hook-wrapper)"
 assert_command_output \
-    "Codex plugin hooks use dedicated script and emit nested SessionStart additionalContext" \
+    "run-hook.cmd wrapper dispatches to the named session-start script" \
     "nested" \
     "" \
     "" \
-    "$codex_home" \
-    PLUGIN_DATA="$codex_data" \
-    CLAUDE_PLUGIN_DATA="$codex_data" \
-    PLUGIN_ROOT="$REPO_ROOT" \
+    "$wrapper_home" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
-    bash "$CODEX_HOOK_UNDER_TEST"
-
-codex_wrapper_home="$(make_home codex-wrapper)"
-codex_wrapper_data="$TEST_ROOT/codex-wrapper/data"
-mkdir -p "$codex_wrapper_data"
-assert_command_output \
-    "Codex wrapper path dispatches to dedicated script" \
-    "nested" \
-    "" \
-    "" \
-    "$codex_wrapper_home" \
-    PLUGIN_DATA="$codex_wrapper_data" \
-    CLAUDE_PLUGIN_DATA="$codex_wrapper_data" \
-    PLUGIN_ROOT="$REPO_ROOT" \
-    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
-    bash "$WRAPPER_UNDER_TEST" session-start-codex
+    bash "$WRAPPER_UNDER_TEST" session-start
 
 cursor_home="$(make_home cursor)"
 assert_command_output \
@@ -217,20 +217,105 @@ assert_command_output \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
     bash "$HOOK_UNDER_TEST"
 
-codex_legacy_home="$(make_home codex-legacy-warning-removed)"
-codex_legacy_data="$TEST_ROOT/codex-legacy-warning-removed/data"
-mkdir -p "$codex_legacy_home/.config/superpowers/skills" "$codex_legacy_data"
+# Regression for #2310: Claude Code can spawn SessionStart:startup hooks with
+# a broken/empty PATH (anthropics/claude-code#43127). session-start and
+# run-hook.cmd's Unix half both shell out to external binaries (dirname, cat)
+# that an empty PATH cannot resolve, even though bash itself was invoked by
+# absolute path. Every call here should use bash's own builtins/redirection
+# instead, so an empty PATH must not change the result.
+bash_bin="$(command -v bash)"
+
+broken_path_home="$(make_home broken-path)"
 assert_command_output \
-    "Codex SessionStart omits obsolete legacy custom-skill warning" \
+    "session-start with empty PATH still emits nested additionalContext" \
     "nested" \
     "" \
-    "Superpowers now uses"$'\037'"~/.config/superpowers/skills"$'\037'"~/.claude/skills"$'\037'"legacy" \
-    "$codex_legacy_home" \
-    PLUGIN_DATA="$codex_legacy_data" \
-    CLAUDE_PLUGIN_DATA="$codex_legacy_data" \
-    PLUGIN_ROOT="$REPO_ROOT" \
+    "" \
+    "$broken_path_home" \
+    PATH="" \
     CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
-    bash "$CODEX_HOOK_UNDER_TEST"
+    "$bash_bin" "$HOOK_UNDER_TEST"
+
+broken_path_wrapper_home="$(make_home broken-path-wrapper)"
+assert_command_output \
+    "run-hook.cmd with empty PATH still dispatches session-start" \
+    "nested" \
+    "" \
+    "" \
+    "$broken_path_wrapper_home" \
+    PATH="" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$bash_bin" "$WRAPPER_UNDER_TEST" session-start
+
+# Run by bare filename from inside hooks/ ($0 has no slash), the plugin root
+# must still resolve.
+bare_name_home="$(make_home bare-name)"
+assert_command_output \
+    "session-start run by bare filename from hooks/ still emits nested additionalContext" \
+    "nested" \
+    "" \
+    "" \
+    "$bare_name_home" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$bash_bin" -c 'cd "$1" && exec "$2" session-start' _ "$REPO_ROOT/hooks" "$bash_bin"
+
+bare_name_wrapper_home="$(make_home bare-name-wrapper)"
+assert_command_output \
+    "run-hook.cmd run by bare filename from hooks/ still dispatches session-start" \
+    "nested" \
+    "" \
+    "" \
+    "$bare_name_wrapper_home" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$bash_bin" -c 'cd "$1" && exec "$2" run-hook.cmd session-start' _ "$REPO_ROOT/hooks" "$bash_bin"
+
+# run-hook.cmd's Windows half starts bash with a backslash path
+# (C:\...\hooks\session-start), so $0 can use \ as its separator. The skill
+# must still be found. On Windows use the real Windows path; elsewhere build
+# a plugin root whose hook is reached through a name containing a backslash.
+backslash_home="$(make_home backslash)"
+if command -v cygpath >/dev/null 2>&1; then
+    backslash_cwd="$REPO_ROOT"
+    backslash_hook="$(cygpath -w "$HOOK_UNDER_TEST")"
+else
+    backslash_cwd="$TEST_ROOT/backslash/root"
+    mkdir -p "$backslash_cwd"
+    ln -s "$REPO_ROOT/hooks" "$backslash_cwd/hooks"
+    ln -s "$REPO_ROOT/skills" "$backslash_cwd/skills"
+    ln -s "$REPO_ROOT/hooks/session-start" "$backslash_cwd/hooks\\session-start"
+    backslash_hook='hooks\session-start'
+fi
+assert_command_output \
+    "session-start reached through a backslash path still reads the skill" \
+    "nested" \
+    "" \
+    "Error reading using-superpowers skill" \
+    "$backslash_home" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$bash_bin" -c 'cd "$1" && exec "$2" "$3"' _ "$backslash_cwd" "$bash_bin" "$backslash_hook"
+
+# When cat is on PATH, the JSON must still go through it: the pipe absorbs
+# EPIPE on Windows + Git Bash (#1612). The stub records that it ran.
+cat_stub_dir="$TEST_ROOT/cat-stub/bin"
+cat_marker="$TEST_ROOT/cat-stub/used"
+mkdir -p "$cat_stub_dir"
+printf '#!%s\n: > "%s"\nexec /bin/cat "$@"\n' "$bash_bin" "$cat_marker" > "$cat_stub_dir/cat"
+chmod +x "$cat_stub_dir/cat"
+cat_stub_home="$(make_home cat-stub)"
+assert_command_output \
+    "session-start with cat on PATH emits nested additionalContext" \
+    "nested" \
+    "" \
+    "" \
+    "$cat_stub_home" \
+    PATH="$cat_stub_dir" \
+    CLAUDE_PLUGIN_ROOT="$REPO_ROOT" \
+    "$bash_bin" "$HOOK_UNDER_TEST"
+if [[ -f "$cat_marker" ]]; then
+    pass "session-start pipes its JSON through cat when cat is on PATH"
+else
+    fail "session-start pipes its JSON through cat when cat is on PATH"
+fi
 
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "STATUS: FAILED ($FAILURES failure(s))"
